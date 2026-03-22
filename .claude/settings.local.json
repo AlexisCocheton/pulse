@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter devices)",
+      "Bash(adb devices)",
+      "Bash(flutter run -d RRCY10056SF)",
+      "Bash(flutter analyze)",
+      "Bash(set DART_VM_OPTIONS=--old_gen_heap_size=2048)",
+      "Bash(python3 -c \":*)",
+      "Bash(powershell -Command \"\\(Get-Content pubspec.yaml\\) -replace ''shared_preferences: \\\\^2\\\\.2\\\\.2'', ''firebase_auth: ^5.3.1'' | Set-Content pubspec.yaml\")",
+      "Bash(flutter pub get)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter run -d RRCY10056SF)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(c.get\\(''client_info'',{}\\).get\\(''android_client_info'',{}\\).get\\(''package_name'',''?''\\)\\) for c in d.get\\(''client'',[]\\)]\")",
+      "Bash(flutter devices --device-timeout 15)",
+      "Bash(flutter devices --device-timeout 20)",
+      "Bash(cmd.exe /c \"adb kill-server && adb start-server && adb devices\")",
+      "Bash(adb kill-server)",
+      "Bash(adb start-server)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter run -d RZCY10VAKXL)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter analyze --no-fatal-infos)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter pub get)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter analyze --no-pub)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter run -d RZCY10VAKXL --no-pub)",
+      "Bash(DART_VM_OPTIONS=--old_gen_heap_size=2048 flutter run -d RRCY10056SF --no-pub)"
+    ]
+  }
+}

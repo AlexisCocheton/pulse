@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "954551225019",
+    "project_id": "pulse-bccf8",
+    "storage_bucket": "pulse-bccf8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954551225019:android:527b30b95a06b2aa21b79e",
+        "android_client_info": {
+          "package_name": "com.pulse.pulse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBe7nmY_ChkKOIvT7z9ezJzLFiRCeUPFn8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
