@@ -352,8 +352,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                     fit: StackFit.expand,
                                     children: [
                                       Image.network(
-                                        profile['image'] as String,
+                                        profile['image'] as String? ?? 'https://images.unsplash.com/photo-1658702041515-18275b138fda?auto=format&fit=crop&w=800&q=80',
                                         fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: Colors.grey.shade200,
+                                          child: const Icon(Icons.person, size: 80, color: Colors.grey),
+                                        ),
                                       ),
                                       Container(
                                         decoration: const BoxDecoration(
@@ -456,6 +460,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                                     padding: EdgeInsets.zero,
                                                   ),
                                                 ),
+                                                if (profile['level'] != null)
                                                 Chip(
                                                   label: Text(
                                                     profile['level'] as String,
@@ -483,7 +488,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                   alignment: Alignment.topLeft,
                                   child: SingleChildScrollView(
                                     child: Text(
-                                      profile['bio'] as String,
+                                      profile['bio'] as String? ?? '',
                                       style: TextStyle(
                                         fontSize: max(13, MediaQuery.of(context).size.width * 0.037),
                                         color: Colors.black87,

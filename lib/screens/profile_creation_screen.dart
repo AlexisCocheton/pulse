@@ -55,7 +55,10 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   bool get _isStepValid {
     switch (_step) {
       case 1:
-        return name.isNotEmpty && age.isNotEmpty && city.isNotEmpty;
+        final parsedAge = int.tryParse(age);
+        return name.isNotEmpty &&
+            parsedAge != null && parsedAge >= 18 && parsedAge <= 99 &&
+            city.isNotEmpty;
       case 2:
         return sports.isNotEmpty;
       case 3:
@@ -347,8 +350,11 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           ),
           const SizedBox(height: 16),
           TextField(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Âge',
+              errorText: age.isNotEmpty && (int.tryParse(age) == null || int.tryParse(age)! < 18 || int.tryParse(age)! > 99)
+                  ? 'Âge invalide (18–99)'
+                  : null,
             ),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => age = v),
