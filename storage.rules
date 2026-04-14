@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Photos de profil
+    match /profiles/{userId}/photo.jpg {
+      // Lecture publique (affichage dans l'app)
+      allow read: if true;
+
+      // Upload : utilisateur connecté, uniquement son propre fichier, max 10 Mo
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+                            && request.resource.size < 10 * 1024 * 1024;
+
+      // Suppression : utilisateur connecté (propriétaire ou admin via modération)
+      allow delete: if request.auth != null;
+    }
+
+  }
+}

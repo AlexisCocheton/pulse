@@ -160,6 +160,9 @@ class SeedService {
       final data = Map<String, dynamic>.from(p)..remove('id');
       data['createdAt'] = FieldValue.serverTimestamp();
       data['updatedAt'] = FieldValue.serverTimestamp();
+      data['isVisible'] = true;
+      data['showAge'] = true;
+      data['showLocation'] = true;
 
       batch.set(
         _firestore.collection('profiles').doc(id),

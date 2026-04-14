@@ -58,23 +58,63 @@ service cloud.firestore {
 
       // ====== MESSAGES (sous-collection) ======
       match /messages/{messageId} {
+        // Lecture : vérifier la participation via la conversation (elle existe déjà lors d'une lecture)
         allow read: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.users;
+        // Création : uniquement vérifier senderId == auth.uid
+        // (pas de get() car la conversation peut ne pas encore exister lors du premier batch)
         allow create: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.users &&
           request.resource.data.senderId == request.auth.uid;
         // Les messages ne sont ni modifiables ni supprimables
         allow update, delete: if false;
       }
     }
 
+    // ====== ADMINS ======
+    // Liste des UID admins (document créé manuellement dans Firebase Console)
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // gestion manuelle uniquement
+    }
+
     // ====== REPORTS ======
-    // Création uniquement, par l'utilisateur connecté
-    // Lecture réservée à l'admin via Admin SDK (moderation_screen utilise des données simulées)
+    // Création : l'émetteur uniquement
+    // Lecture : émetteur ou destinataire (voir son propre signalement)
+    // Update : admin seulement (vérifié via collection admins)
     match /reports/{reportId} {
       allow create: if request.auth != null &&
         request.resource.data.fromUserId == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read: if request.auth != null && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+      allow update: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow delete: if false;
+    }
+
+    // ====== PHOTO REPORTS ======
+    // Écriture : Cloud Functions via Admin SDK (bypasse les règles)
+    // Lecture/Update : propriétaire ou admin
+    match /photo_reports/{userId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+      allow update: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow create, delete: if false; // Cloud Functions seulement
+    }
+
+    // ====== MODERATION LOGS ======
+    // Création et lecture : admin seulement
+    match /moderation_logs/{logId} {
+      allow create: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow read: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow update, delete: if false;
     }
   }
 }

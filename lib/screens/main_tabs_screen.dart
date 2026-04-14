@@ -18,6 +18,33 @@ class MainTabsScreen extends StatefulWidget {
 class _MainTabsScreenState extends State<MainTabsScreen> {
   MainTab _currentTab = MainTab.discover;
   final String? _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  DateTime? _likesLastSeenAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLikesLastSeenAt();
+  }
+
+  Future<void> _loadLikesLastSeenAt() async {
+    if (_currentUserId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('profiles')
+        .doc(_currentUserId)
+        .get();
+    final ts = doc.data()?['likesLastSeenAt'] as Timestamp?;
+    if (mounted) setState(() => _likesLastSeenAt = ts?.toDate());
+  }
+
+  Future<void> _markLikesSeen() async {
+    if (_currentUserId == null) return;
+    final now = DateTime.now();
+    setState(() => _likesLastSeenAt = now);
+    await FirebaseFirestore.instance
+        .collection('profiles')
+        .doc(_currentUserId)
+        .update({'likesLastSeenAt': FieldValue.serverTimestamp()});
+  }
 
   Stream<int> get _unreadMessagesStream {
     if (_currentUserId == null) return Stream.value(0);
@@ -43,11 +70,23 @@ class _MainTabsScreenState extends State<MainTabsScreen> {
         .where('toUserId', isEqualTo: _currentUserId!)
         .where('type', whereIn: ['like', 'super_like'])
         .snapshots()
-        .map((snapshot) => snapshot.size);
+        .map((snapshot) {
+      final seenAt = _likesLastSeenAt;
+      if (seenAt == null) return snapshot.size;
+      return snapshot.docs.where((doc) {
+        final createdAt =
+            (doc.data()['createdAt'] as Timestamp?)?.toDate();
+        if (createdAt == null) return true;
+        return createdAt.isAfter(seenAt);
+      }).length;
+    });
   }
 
   void _onTabSelected(int index) {
     setState(() => _currentTab = MainTab.values[index]);
+    if (MainTab.values[index] == MainTab.likes) {
+      _markLikesSeen();
+    }
   }
 
   @override
