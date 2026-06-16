@@ -27,39 +27,56 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _load() async {
-    if (_uid == null) return;
-    final doc = await FirebaseFirestore.instance
-        .collection('profiles')
-        .doc(_uid)
-        .get();
-    final data = doc.data() ?? {};
-    final perm = await NotificationService().hasPermission;
-    setState(() {
-      _notifLikes = (data['notifLikes'] as bool?) ?? true;
-      _notifMessages = (data['notifMessages'] as bool?) ?? true;
-      _notifMatches = (data['notifMatches'] as bool?) ?? true;
-      _hasPermission = perm;
-      _isLoading = false;
-    });
+    if (_uid == null) { setState(() => _isLoading = false); return; }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('profiles')
+          .doc(_uid)
+          .get();
+      final data = doc.data() ?? {};
+      final perm = await NotificationService().hasPermission;
+      if (!mounted) return;
+      setState(() {
+        _notifLikes = (data['notifLikes'] as bool?) ?? true;
+        _notifMessages = (data['notifMessages'] as bool?) ?? true;
+        _notifMatches = (data['notifMatches'] as bool?) ?? true;
+        _hasPermission = perm;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur de chargement'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _save() async {
     if (_uid == null) return;
     setState(() => _isSaving = true);
-    await FirebaseFirestore.instance.collection('profiles').doc(_uid).set({
-      'notifLikes': _notifLikes,
-      'notifMessages': _notifMessages,
-      'notifMatches': _notifMatches,
-    }, SetOptions(merge: true));
-    setState(() => _isSaving = false);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Préférences sauvegardées'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    try {
+      await FirebaseFirestore.instance.collection('profiles').doc(_uid).set({
+        'notifLikes': _notifLikes,
+        'notifMessages': _notifMessages,
+        'notifMatches': _notifMatches,
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Préférences sauvegardées'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override

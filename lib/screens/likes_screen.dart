@@ -195,26 +195,42 @@ class _LikesScreenState extends State<LikesScreen>
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+    try {
+      _currentUserId = await _authService.getCurrentUserId();
+      if (_currentUserId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
-    _currentUserId = await _authService.getCurrentUserId();
-    if (_currentUserId == null) {
+      final matches = await _profileService.getMatches(_currentUserId!);
+      final matchIds = matches.map((m) => m['id'] as String).toSet();
+
+      final likesReceived =
+          await _profileService.getLikesReceived(_currentUserId!);
+      final nonMutualLikes =
+          likesReceived.where((l) => !matchIds.contains(l['id'])).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _matches = matches;
+        _receivedLikes = nonMutualLikes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Erreur de chargement. Réessayer ?'),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'Réessayer',
+            textColor: Colors.white,
+            onPressed: _loadData,
+          ),
+        ),
+      );
     }
-
-    final matches = await _profileService.getMatches(_currentUserId!);
-    final matchIds = matches.map((m) => m['id'] as String).toSet();
-
-    final likesReceived =
-        await _profileService.getLikesReceived(_currentUserId!);
-    final nonMutualLikes =
-        likesReceived.where((l) => !matchIds.contains(l['id'])).toList();
-
-    setState(() {
-      _matches = matches;
-      _receivedLikes = nonMutualLikes;
-      _isLoading = false;
-    });
   }
 
   @override
@@ -441,7 +457,15 @@ class _LikeCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   image.isNotEmpty
-                      ? Image.network(image, fit: BoxFit.cover)
+                      ? Image.network(
+                          image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.person,
+                                size: 48, color: Colors.grey),
+                          ),
+                        )
                       : Container(
                           color: Colors.grey.shade200,
                           child: const Icon(Icons.person,

@@ -12,88 +12,155 @@ initializeApp();
 // Secret à créer via : firebase functions:secrets:set VISION_API_KEY
 const VISION_API_KEY = defineSecret("VISION_API_KEY");
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Envoie une notification FCM et supprime le token si invalide/expiré.
+ * Retourne true si envoyé, false sinon (token absent, désactivé, ou erreur non-fatale).
+ */
+async function sendNotification(token, payload) {
+  if (!token) return false;
+  try {
+    await getMessaging().send({ token, ...payload });
+    return true;
+  } catch (err) {
+    // Codes indiquant un token définitivement invalide → on le supprime du profil
+    const staleTokenCodes = [
+      "messaging/registration-token-not-registered",
+      "messaging/invalid-registration-token",
+      "messaging/invalid-argument",
+    ];
+    if (staleTokenCodes.includes(err.code)) {
+      // Retrouver l'uid associé au token pour le nettoyer
+      const snap = await getFirestore()
+        .collection("profiles")
+        .where("fcmToken", "==", token)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        await snap.docs[0].ref.update({ fcmToken: null });
+      }
+    }
+    console.error("[FCM] Erreur envoi :", err.code, err.message);
+    return false;
+  }
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 exports.onNewLike = onDocumentCreated(
   "interactions/{docId}",
   async (event) => {
-    const data = event.data.data();
-    if (data.type !== "like") return;
+    try {
+      if (!event.data) return;
+      const data = event.data.data();
+      // Notifier pour like ET super_like
+      if (data.type !== "like" && data.type !== "super_like") return;
 
-    const toUserId = data.toUserId;
-    const fromUserId = data.fromUserId;
+      const { toUserId, fromUserId } = data;
+      if (!toUserId || !fromUserId) return;
 
-    const toUserDoc = await getFirestore().collection("profiles").doc(toUserId).get();
-    const fcmToken = toUserDoc.data()?.fcmToken;
-    if (!fcmToken) return;
-    if (toUserDoc.data()?.notifLikes === false) return;
+      const [toUserDoc, fromUserDoc] = await Promise.all([
+        getFirestore().collection("profiles").doc(toUserId).get(),
+        getFirestore().collection("profiles").doc(fromUserId).get(),
+      ]);
 
-    const fromUserDoc = await getFirestore().collection("profiles").doc(fromUserId).get();
-    const fromName = fromUserDoc.data()?.name ?? "Quelqu'un";
+      if (!toUserDoc.exists) return;
+      const fcmToken = toUserDoc.data()?.fcmToken;
+      if (!fcmToken || toUserDoc.data()?.notifLikes === false) return;
 
-    await getMessaging().send({
-      token: fcmToken,
-      notification: { title: "Nouveau like 💙", body: `${fromName} vous a liké !` },
-      android: { notification: { channelId: "pulse_default" } },
-    });
+      const fromName = fromUserDoc.exists ? (fromUserDoc.data()?.name ?? "Quelqu'un") : "Quelqu'un";
+      const isSuperLike = data.type === "super_like";
+
+      await sendNotification(fcmToken, {
+        notification: {
+          title: isSuperLike ? "Super like ⭐" : "Nouveau like 💙",
+          body: isSuperLike ? `${fromName} vous a super liké !` : `${fromName} vous a liké !`,
+        },
+        android: { notification: { channelId: "pulse_default" } },
+      });
+    } catch (err) {
+      console.error("[onNewLike] Erreur :", err);
+    }
   }
 );
 
 exports.onNewMatch = onDocumentCreated(
   "matches/{matchId}",
   async (event) => {
-    const data = event.data.data();
-    const [uid1, uid2] = data.users ?? [];
+    try {
+      if (!event.data) return;
+      const data = event.data.data();
+      const users = data.users;
+      if (!Array.isArray(users) || users.length < 2) return;
+      const [uid1, uid2] = users;
+      if (!uid1 || !uid2) return;
 
-    const [doc1, doc2] = await Promise.all([
-      getFirestore().collection("profiles").doc(uid1).get(),
-      getFirestore().collection("profiles").doc(uid2).get(),
-    ]);
+      const [doc1, doc2] = await Promise.all([
+        getFirestore().collection("profiles").doc(uid1).get(),
+        getFirestore().collection("profiles").doc(uid2).get(),
+      ]);
 
-    const sends = [];
-    if (doc1.data()?.fcmToken && doc1.data()?.notifMatches !== false) {
-      sends.push(getMessaging().send({
-        token: doc1.data().fcmToken,
-        notification: { title: "Nouveau match ! 🎉", body: `Vous avez matché avec ${doc2.data()?.name} !` },
-      }));
+      const name1 = doc1.exists ? (doc1.data()?.name ?? "Quelqu'un") : "Quelqu'un";
+      const name2 = doc2.exists ? (doc2.data()?.name ?? "Quelqu'un") : "Quelqu'un";
+
+      const sends = [];
+      if (doc1.exists && doc1.data()?.fcmToken && doc1.data()?.notifMatches !== false) {
+        sends.push(sendNotification(doc1.data().fcmToken, {
+          notification: { title: "Nouveau match ! 🎉", body: `Vous avez matché avec ${name2} !` },
+          android: { notification: { channelId: "pulse_default" } },
+        }));
+      }
+      if (doc2.exists && doc2.data()?.fcmToken && doc2.data()?.notifMatches !== false) {
+        sends.push(sendNotification(doc2.data().fcmToken, {
+          notification: { title: "Nouveau match ! 🎉", body: `Vous avez matché avec ${name1} !` },
+          android: { notification: { channelId: "pulse_default" } },
+        }));
+      }
+      await Promise.all(sends);
+    } catch (err) {
+      console.error("[onNewMatch] Erreur :", err);
     }
-    if (doc2.data()?.fcmToken && doc2.data()?.notifMatches !== false) {
-      sends.push(getMessaging().send({
-        token: doc2.data().fcmToken,
-        notification: { title: "Nouveau match ! 🎉", body: `Vous avez matché avec ${doc1.data()?.name} !` },
-      }));
-    }
-    await Promise.all(sends);
   }
 );
 
 exports.onNewMessage = onDocumentCreated(
   "conversations/{convId}/messages/{msgId}",
   async (event) => {
-    const data = event.data.data();
-    const senderId = data.senderId;
-    const convId = event.params.convId;
+    try {
+      if (!event.data) return;
+      const data = event.data.data();
+      const senderId = data.senderId;
+      const convId = event.params.convId;
+      if (!senderId) return;
 
-    const convDoc = await getFirestore().collection("conversations").doc(convId).get();
-    const users = convDoc.data()?.users ?? [];
-    const receiverId = users.find((u) => u !== senderId);
-    if (!receiverId) return;
+      const convDoc = await getFirestore().collection("conversations").doc(convId).get();
+      if (!convDoc.exists) return;
+      const users = convDoc.data()?.users ?? [];
+      const receiverId = users.find((u) => u !== senderId);
+      if (!receiverId) return;
 
-    const receiverDoc = await getFirestore().collection("profiles").doc(receiverId).get();
-    const fcmToken = receiverDoc.data()?.fcmToken;
-    if (!fcmToken) return;
-    if (receiverDoc.data()?.notifMessages === false) return;
+      const [receiverDoc, senderDoc] = await Promise.all([
+        getFirestore().collection("profiles").doc(receiverId).get(),
+        getFirestore().collection("profiles").doc(senderId).get(),
+      ]);
 
-    const senderDoc = await getFirestore().collection("profiles").doc(senderId).get();
-    const senderName = senderDoc.data()?.name ?? "Quelqu'un";
+      if (!receiverDoc.exists) return;
+      const fcmToken = receiverDoc.data()?.fcmToken;
+      if (!fcmToken || receiverDoc.data()?.notifMessages === false) return;
 
-    await getMessaging().send({
-      token: fcmToken,
-      notification: {
-        title: senderName,
-        body: data.text?.substring(0, 100) ?? "Nouveau message",
-      },
-    });
+      const senderName = senderDoc.exists ? (senderDoc.data()?.name ?? "Quelqu'un") : "Quelqu'un";
+
+      await sendNotification(fcmToken, {
+        notification: {
+          title: senderName,
+          body: data.text?.substring(0, 100) ?? "Nouveau message",
+        },
+        android: { notification: { channelId: "pulse_default" } },
+      });
+    } catch (err) {
+      console.error("[onNewMessage] Erreur :", err);
+    }
   }
 );
 
@@ -218,6 +285,9 @@ function callVisionSafeSearch(base64Image, apiKey) {
         try {
           const json = JSON.parse(data);
           if (json.error) return reject(new Error(json.error.message));
+          // Erreur par requête (quota, format non supporté, etc.)
+          const responseError = json.responses?.[0]?.error;
+          if (responseError) return reject(new Error(responseError.message ?? "Vision API per-request error"));
           const a = json.responses?.[0]?.safeSearchAnnotation ?? {};
           resolve({
             adult:    a.adult    ?? "UNKNOWN",

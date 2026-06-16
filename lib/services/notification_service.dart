@@ -19,8 +19,9 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
+  // ID doit correspondre exactement au channelId envoyé par les Cloud Functions
   static const _androidChannel = AndroidNotificationChannel(
-    'pulse_channel',
+    'pulse_default',
     'Pulse Notifications',
     description: 'Notifications Pulse (likes, messages, matchs)',
     importance: Importance.high,
@@ -73,11 +74,16 @@ class NotificationService {
       );
     });
 
-    // Save token to Firestore
+    // Sauvegarder le token si déjà connecté, sinon attendre la connexion
     await _saveToken();
 
     // Refresh token when rotated
     _fcm.onTokenRefresh.listen(_saveTokenToFirestore);
+
+    // Re-sauvegarder le token à chaque connexion (cas : init avant login)
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) _saveToken();
+    });
   }
 
   Future<void> _saveToken() async {

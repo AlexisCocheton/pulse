@@ -28,6 +28,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ProfileService _profileService = ProfileService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
@@ -300,12 +301,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController
-                        .jumpTo(_scrollController.position.maxScrollExtent);
-                  }
-                });
+                // Ne scroller en bas que si un nouveau message est arrivé
+                if (messages.length > _lastMessageCount) {
+                  _lastMessageCount = messages.length;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController
+                          .jumpTo(_scrollController.position.maxScrollExtent);
+                    }
+                  });
+                }
 
                 return ListView.builder(
                   controller: _scrollController,
@@ -327,7 +332,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (showDate && timestamp != null)
                           _DateDivider(date: timestamp.toDate()),
                         _MessageBubble(
-                          text: msg['text'] as String,
+                          text: msg['text']?.toString() ?? '',
                           isMe: isMe,
                           timestamp: timestamp,
                         ),
@@ -482,9 +487,18 @@ class _DateDivider extends StatelessWidget {
         date.month == now.month &&
         date.year == now.year) {
       label = "Aujourd'hui";
-    } else if (date.day == now.day - 1 &&
-        date.month == now.month &&
-        date.year == now.year) {
+    } else if (DateTime(now.year, now.month, now.day)
+            .subtract(const Duration(days: 1))
+            .day ==
+        date.day &&
+        DateTime(now.year, now.month, now.day)
+                .subtract(const Duration(days: 1))
+                .month ==
+            date.month &&
+        DateTime(now.year, now.month, now.day)
+                .subtract(const Duration(days: 1))
+                .year ==
+            date.year) {
       label = 'Hier';
     } else {
       label = '${date.day}/${date.month}/${date.year}';

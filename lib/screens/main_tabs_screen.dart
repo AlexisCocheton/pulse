@@ -72,7 +72,8 @@ class _MainTabsScreenState extends State<MainTabsScreen> {
         .snapshots()
         .map((snapshot) {
       final seenAt = _likesLastSeenAt;
-      if (seenAt == null) return snapshot.size;
+      // Retourner 0 pendant le chargement de likesLastSeenAt (évite le flash "47 likes")
+      if (seenAt == null) return 0;
       return snapshot.docs.where((doc) {
         final createdAt =
             (doc.data()['createdAt'] as Timestamp?)?.toDate();

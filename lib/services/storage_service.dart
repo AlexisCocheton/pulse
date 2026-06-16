@@ -8,9 +8,12 @@ class StorageService {
   Future<String> uploadProfilePhoto(String userId, File file) async {
     try {
       final ref = _storage.ref().child('profiles/$userId/photo.jpg');
+      // Détecter le vrai type MIME à partir de l'extension
+      final ext = file.path.split('.').last.toLowerCase();
+      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
       final task = await ref.putFile(
         file,
-        SettableMetadata(contentType: 'image/jpeg'),
+        SettableMetadata(contentType: mime),
       );
       return await task.ref.getDownloadURL();
     } on FirebaseException catch (e) {

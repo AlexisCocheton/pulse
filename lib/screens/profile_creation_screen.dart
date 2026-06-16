@@ -91,7 +91,10 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
 
       // 2. Convertir les IDs de sports en noms lisibles
       final sportNames = sports.map((id) {
-        final sport = availableSports.firstWhere((s) => s.$1 == id);
+        final sport = availableSports.firstWhere(
+          (s) => s.$1 == id,
+          orElse: () => (id, Icons.sports, id), // fallback : utiliser l'id brut si inconnu
+        );
         return sport.$3;
       }).toList();
 

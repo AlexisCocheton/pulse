@@ -131,8 +131,12 @@ class ModerationService {
 
     try {
       await _storage.ref().child('profiles/$userId/photo.jpg').delete();
-    } catch (_) {
-      // Fichier déjà supprimé ou inexistant
+    } on FirebaseException catch (e) {
+      // Fichier déjà supprimé ou inexistant — on ignore (not-found), mais on log les autres erreurs
+      if (e.code != 'object-not-found') {
+        // ignore: avoid_print
+        print('[ModerationService] Erreur suppression Storage photo $userId : ${e.code} ${e.message}');
+      }
     }
 
     await _log(userId: userId, action: 'photo_rejected', reason: reason);

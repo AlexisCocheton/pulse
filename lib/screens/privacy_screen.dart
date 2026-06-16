@@ -25,37 +25,54 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   }
 
   Future<void> _load() async {
-    if (_uid == null) return;
-    final doc = await FirebaseFirestore.instance
-        .collection('profiles')
-        .doc(_uid)
-        .get();
-    final data = doc.data() ?? {};
-    setState(() {
-      _isVisible = (data['isVisible'] as bool?) ?? true;
-      _showAge = (data['showAge'] as bool?) ?? true;
-      _showLocation = (data['showLocation'] as bool?) ?? true;
-      _isLoading = false;
-    });
+    if (_uid == null) { setState(() => _isLoading = false); return; }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('profiles')
+          .doc(_uid)
+          .get();
+      final data = doc.data() ?? {};
+      if (!mounted) return;
+      setState(() {
+        _isVisible = (data['isVisible'] as bool?) ?? true;
+        _showAge = (data['showAge'] as bool?) ?? true;
+        _showLocation = (data['showLocation'] as bool?) ?? true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur de chargement'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _save() async {
     if (_uid == null) return;
     setState(() => _isSaving = true);
-    await FirebaseFirestore.instance.collection('profiles').doc(_uid).set({
-      'isVisible': _isVisible,
-      'showAge': _showAge,
-      'showLocation': _showLocation,
-    }, SetOptions(merge: true));
-    setState(() => _isSaving = false);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Préférences sauvegardées'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    try {
+      await FirebaseFirestore.instance.collection('profiles').doc(_uid).set({
+        'isVisible': _isVisible,
+        'showAge': _showAge,
+        'showLocation': _showLocation,
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Préférences sauvegardées'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override

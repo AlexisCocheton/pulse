@@ -20,8 +20,8 @@ class ProfileService {
     String? ethnicity,
   }) async {
     try {
-      // Vérifier que Firestore est initialisé
-      await _firestore.enableNetwork();
+      final docRef = _firestore.collection(_collectionName).doc(userId);
+      // Note: enableNetwork() retiré — Firestore gère son état réseau automatiquement
 
       final data = <String, dynamic>{
         'name': name,
@@ -32,7 +32,6 @@ class ProfileService {
         'bio': bio,
         'image': imageUrl ??
             'https://images.unsplash.com/photo-1658702041515-18275b138fda?auto=format&fit=crop&w=800&q=80',
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -41,10 +40,13 @@ class ProfileService {
       if (height != null) data['height'] = height;
       if (ethnicity != null) data['ethnicity'] = ethnicity;
 
-      await _firestore
-          .collection(_collectionName)
-          .doc(userId)
-          .set(data, SetOptions(merge: true));
+      // N'écrire createdAt que si le document n'existe pas encore
+      final existing = await docRef.get();
+      if (!existing.exists) {
+        data['createdAt'] = FieldValue.serverTimestamp();
+      }
+
+      await docRef.set(data, SetOptions(merge: true));
     } on FirebaseException catch (e) {
       throw Exception('Erreur Firestore (${e.code}): ${e.message}');
     } catch (e) {
@@ -228,6 +230,7 @@ class ProfileService {
         'fromUserId': fromUserId,
         'toUserId': toUserId,
         'reason': reason,
+        'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseException catch (e) {
@@ -241,17 +244,17 @@ class ProfileService {
       final matchId = ([userId1, userId2]..sort());
       final matchDocId = '${matchId[0]}-${matchId[1]}';
 
+      // Tout dans un seul batch — atomique, pas de fenêtre de crash
       final batch = _firestore.batch();
       batch.delete(_firestore.collection('matches').doc(matchDocId));
       batch.delete(_firestore.collection('interactions').doc('$userId1-$userId2'));
       batch.delete(_firestore.collection('interactions').doc('$userId2-$userId1'));
+      batch.set(
+        _firestore.collection('conversations').doc(matchDocId),
+        {'archived': true},
+        SetOptions(merge: true),
+      );
       await batch.commit();
-
-      // Archiver la conversation
-      await _firestore
-          .collection('conversations')
-          .doc(matchDocId)
-          .set({'archived': true}, SetOptions(merge: true));
     } on FirebaseException catch (e) {
       throw Exception('Erreur unmatch (${e.code}): ${e.message}');
     }
