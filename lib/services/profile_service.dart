@@ -18,6 +18,8 @@ class ProfileService {
     String? lookingFor,
     int? height,
     String? ethnicity,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final docRef = _firestore.collection(_collectionName).doc(userId);
@@ -39,6 +41,12 @@ class ProfileService {
       if (lookingFor != null) data['lookingFor'] = lookingFor;
       if (height != null) data['height'] = height;
       if (ethnicity != null) data['ethnicity'] = ethnicity;
+      if (latitude != null && longitude != null) {
+        data['location_coords'] = {
+          'latitude': latitude,
+          'longitude': longitude,
+        };
+      }
 
       // N'écrire createdAt que si le document n'existe pas encore
       final existing = await docRef.get();

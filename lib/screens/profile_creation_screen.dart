@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'main_tabs_screen.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart';
 
 class ProfileCreationScreen extends StatefulWidget {
   const ProfileCreationScreen({super.key});
@@ -26,9 +27,13 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   String passwordConfirm = '';
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
+  double? _latitude;
+  double? _longitude;
+  bool _isLoadingLocation = false;
 
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
+  final LocationService _locationService = LocationService();
   final levels = const ['Débutant', 'Intermédiaire', 'Avancé', 'Expert'];
 
   final availableSports = const [
@@ -107,6 +112,8 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
         sports: sportNames,
         level: level,
         bio: bio,
+        latitude: _latitude,
+        longitude: _longitude,
       );
 
       if (!mounted) return;
@@ -370,9 +377,63 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
             ),
             onChanged: (v) => setState(() => city = v),
           ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _isLoadingLocation ? null : _getLocation,
+            icon: _isLoadingLocation
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.location_on),
+            label: Text(
+              _latitude != null && _longitude != null
+                  ? 'Localisation détectée ✓'
+                  : 'Utiliser ma localisation',
+            ),
+          ),
+          if (_latitude != null && _longitude != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'Latitude: ${_latitude!.toStringAsFixed(4)}, Longitude: ${_longitude!.toStringAsFixed(4)}',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _getLocation() async {
+    setState(() => _isLoadingLocation = true);
+    try {
+      final location = await _locationService.getCurrentLocation();
+      setState(() {
+        _latitude = location['latitude'];
+        _longitude = location['longitude'];
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Localisation détectée avec succès')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
   }
 
   Widget _buildStep2() {

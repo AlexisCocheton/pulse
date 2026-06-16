@@ -17,6 +17,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   bool _isVisible = true;
   bool _showAge = true;
   bool _showLocation = true;
+  double _maxDistance = 5.0;
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
         _isVisible = (data['isVisible'] as bool?) ?? true;
         _showAge = (data['showAge'] as bool?) ?? true;
         _showLocation = (data['showLocation'] as bool?) ?? true;
+        _maxDistance = ((data['maxDistance'] as num?) ?? 5).toDouble();
         _isLoading = false;
       });
     } catch (e) {
@@ -56,6 +58,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
         'isVisible': _isVisible,
         'showAge': _showAge,
         'showLocation': _showLocation,
+        'maxDistance': _maxDistance,
       }, SetOptions(merge: true));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +144,46 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
                       value: _showLocation,
                       onChanged: (v) => setState(() => _showLocation = v),
                       activeColor: const Color(0xFF2563EB),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildSection(
+                  title: 'Distance de recherche',
+                  icon: Icons.location_on_outlined,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Distance maximale : ${_maxDistance.toStringAsFixed(0)} km',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Slider(
+                            value: _maxDistance,
+                            min: 5,
+                            max: 100,
+                            divisions: 19,
+                            label: '${_maxDistance.toStringAsFixed(0)} km',
+                            onChanged: (v) => setState(() => _maxDistance = v),
+                            activeColor: const Color(0xFF2563EB),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Définissez la distance maximale pour les correspondances',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

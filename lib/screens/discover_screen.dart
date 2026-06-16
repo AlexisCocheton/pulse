@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
+import '../services/matching_service.dart';
+import '../services/location_service.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -16,11 +18,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _showInfo = false;
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
+  final MatchingService _matchingService = MatchingService();
   List<Map<String, dynamic>> profiles = [];
   bool _isLoading = true;
   String? _error;
   String? _currentUserId;
   double _dragOffset = 0;
+  double _maxDistance = 5.0;
 
   @override
   void initState() {
@@ -37,7 +41,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
       // Récupérer l'userId de l'utilisateur connecté
       _currentUserId = await _authService.getCurrentUserId();
-      
+
       if (_currentUserId == null) {
         setState(() {
           _error = 'Vous devez créer un profil d\'abord';
@@ -46,15 +50,75 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         return;
       }
 
-      // Charger les profils découvrables (exclut les passes)
-      final loadedProfiles = await _profileService.getDiscoverableProfiles(_currentUserId!);
-      
-      // Ajouter une distance aléatoire pour chaque profil (simulation)
+      // Récupérer la distance maximale depuis Firestore
+      final userProfile = await _profileService.getProfile(_currentUserId!);
+      if (userProfile != null) {
+        _maxDistance = ((userProfile['maxDistance'] as num?) ?? 5.0).toDouble();
+      }
+
+      // Essayer de charger les profils depuis le backend API
+      List<Map<String, dynamic>> loadedProfiles = [];
+      try {
+        loadedProfiles = await _matchingService.getMatchCandidates(
+          userId: _currentUserId!,
+          maxDistance: _maxDistance,
+          limit: 20,
+        );
+      } catch (apiError) {
+        // Fallback : charger les profils découvrables localement
+        loadedProfiles = await _profileService.getDiscoverableProfiles(_currentUserId!);
+
+        // Filtrer par distance si on a les coordonnées
+        if (userProfile != null && userProfile['location_coords'] != null) {
+          final userLat = userProfile['location_coords']['latitude'] as double?;
+          final userLong = userProfile['location_coords']['longitude'] as double?;
+
+          if (userLat != null && userLong != null) {
+            final locationService = LocationService();
+            loadedProfiles = loadedProfiles.where((profile) {
+              final targetCoords = profile['location_coords'] as Map?;
+              if (targetCoords == null) return false;
+
+              final targetLat = targetCoords['latitude'] as double?;
+              final targetLong = targetCoords['longitude'] as double?;
+
+              if (targetLat == null || targetLong == null) return false;
+
+              final distance = locationService.calculateDistance(
+                userLat, userLong, targetLat, targetLong
+              );
+              return distance <= _maxDistance;
+            }).toList();
+          }
+        }
+      }
+
       final profilesWithDistance = loadedProfiles.map((profile) {
-        final distance = (Random().nextDouble() * 5 + 1).toStringAsFixed(1);
+        // Calculer la distance réelle si on a les coordonnées
+        String distance = 'N/A';
+        if (userProfile != null && userProfile['location_coords'] != null) {
+          final userCoords = userProfile['location_coords'] as Map?;
+          final targetCoords = profile['location_coords'] as Map?;
+
+          if (userCoords != null && targetCoords != null) {
+            final userLat = userCoords['latitude'] as double?;
+            final userLong = userCoords['longitude'] as double?;
+            final targetLat = targetCoords['latitude'] as double?;
+            final targetLong = targetCoords['longitude'] as double?;
+
+            if (userLat != null && userLong != null && targetLat != null && targetLong != null) {
+              final locationService = LocationService();
+              final dist = locationService.calculateDistance(
+                userLat, userLong, targetLat, targetLong
+              );
+              distance = '${dist.toStringAsFixed(1)} km';
+            }
+          }
+        }
+
         return {
           ...profile,
-          'distance': '$distance km',
+          'distance': distance,
         };
       }).toList();
 
